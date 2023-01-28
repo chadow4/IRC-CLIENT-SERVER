@@ -139,6 +139,28 @@ client_t * checkIfSocketIsNull(){
     }
     return NULL;
 }
+void disconnectClient(char * pseudo){
+    node_t *disconnect_node = head;
+    char buffer[1024] = {0};
+    while(disconnect_node != NULL){
+        client_t *client = disconnect_node->client;
+        if(strcmp(client->pseudo,pseudo) == 0){
+            yellow();
+            printf("%s with socket %d is disconnected\n", client->pseudo, client->sockfd);
+            reset();
+            snprintf(buffer, sizeof(buffer),
+                     "you are now disconnected because your pseudo is now registered by an other client.");
+            if (send(client->sockfd, buffer, 1024,0) < 0) {
+                stop("send");
+            }
+            memset(client->pseudo, '\0', 256);
+            close(client->sockfd);
+            client->sockfd = -1;
+            client->pseudoSet = 0;
+        }
+        disconnect_node = (node_t *) disconnect_node->next;
+    }
+}
 
 void printDebugLC(){
     node_t *current = head;
@@ -289,8 +311,6 @@ int main(int argc, char const *argv[]) {
                 client_existing->pseudoSet = 0;
             }
 
-
-
         }
         // Else, check the other file descriptors
         node_t *current_node = head;
@@ -372,46 +392,38 @@ int main(int argc, char const *argv[]) {
                                     }
                                 }
                                 else{
-                                    if (checkIfPseudoExistInLC(nickname) == -1) {
-                                        memset(buffer, '\0', 1024);
-                                        snprintf(buffer, sizeof(buffer),
-                                                 "Sorry, pseudo is already use, please retry /nickname new_pseudo :");
-                                        if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
-                                            stop("send");
-                                        }
-                                    }
-                                    else {
-                                        if(checkIfPseudoExistInRegisterFile(nickname) == -1){
-                                            char * checkedPseudo = calloc(sizeof(char),32);
-                                           checkedPseudo = checkerRegisterFile(nickname,password);
-                                            if(checkedPseudo != NULL){
-                                                strncpy(current_client->pseudo, checkedPseudo, 32);
-                                                memset(buffer, '\0', 1024);
-                                                yellow();
-                                                printf("set new pseudo %s for socket %d \n", current_client->pseudo,
-                                                       current_client->sockfd);
-                                                reset();
-                                                snprintf(buffer, sizeof(buffer), "your new pseudo is %s", current_client->pseudo);
-                                                if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
-                                                    stop("send");
-                                                }
-                                            } else{
-                                                memset(buffer, '\0', 1024);
-                                                snprintf(buffer, sizeof(buffer),
-                                                         "Sorry, error on set registered pseudo please retry /nickname pseudo password :");
-                                                if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
-                                                    stop("send");
-                                                }
+                                    if(checkIfPseudoExistInRegisterFile(nickname) == -1){
+                                        char * checkedPseudo = calloc(sizeof(char),32);
+                                       checkedPseudo = checkerRegisterFile(nickname,password);
+                                        if(checkedPseudo != NULL){
+                                            disconnectClient(checkedPseudo);
+                                            strncpy(current_client->pseudo, checkedPseudo, 32);
+                                            memset(buffer, '\0', 1024);
+                                            yellow();
+                                            printf("set new pseudo %s for socket %d \n", current_client->pseudo,
+                                                   current_client->sockfd);
+                                            reset();
+                                            snprintf(buffer, sizeof(buffer), "your new pseudo is %s", current_client->pseudo);
+                                            if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
+                                                stop("send");
                                             }
-                                        }else{
+                                        } else{
                                             memset(buffer, '\0', 1024);
                                             snprintf(buffer, sizeof(buffer),
-                                                     "Sorry, pseudo is not registered, please retry /nickname pseudo password :");
+                                                     "Sorry, error on set registered pseudo please retry /nickname pseudo password :");
                                             if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
                                                 stop("send");
                                             }
                                         }
+                                    }else{
+                                        memset(buffer, '\0', 1024);
+                                        snprintf(buffer, sizeof(buffer),
+                                                 "Sorry, pseudo is not registered, please retry /nickname pseudo password :");
+                                        if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
+                                            stop("send");
+                                        }
                                     }
+
                                 }
 
                             }
@@ -442,7 +454,6 @@ int main(int argc, char const *argv[]) {
                             reset();
                             close(current_client->sockfd);
                             current_client->sockfd = -1;
-                            // removeClient(current_client);
 
                         }
 
