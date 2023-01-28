@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <time.h>
-#include "sha.h"
 
 #define PORT 8081
 #define MAX_CLIENTS 100
@@ -74,7 +73,50 @@ void SendToAllClients(char *buffer, int sockfd) {
     }
 }
 
-int CheckIfPseudoExist(char *pseudo) {
+int checkIfPseudoExistInRegisterFile(char * pseudo){
+    FILE *fileRead;
+    fileRead = fopen("login.dat", "rb");
+    if (fileRead == NULL) {
+        printf("Error opening file\n");
+        return 1;
+    }
+    char * pseudoReading = calloc(sizeof(char),32+1);
+    while(fread(pseudoReading,32,sizeof(char),fileRead)){
+        if(strcmp(pseudo, pseudoReading) == 0){
+            return -1;
+        }
+        fseek(fileRead,256,SEEK_CUR);
+
+    }
+    fclose(fileRead);
+    return 0;
+}
+
+char * checkerRegisterFile(char * pseudo, char * password){
+    FILE *fileRead;
+    fileRead = fopen("login.dat","rb");
+    if(fileRead == NULL){
+        printf("Error opening file\n");
+        return NULL;
+    }
+    char * pseudoReading = calloc(sizeof(char),32+1);
+    char * passwordReading = calloc(sizeof(char),256+1);
+    while(fread(pseudoReading,32,sizeof(char),fileRead)){
+        if(strcmp(pseudo,pseudoReading) == 0){
+            fread(passwordReading,256,sizeof(char),fileRead);
+            if(strcmp(password,passwordReading) == 0){
+                return pseudoReading;
+            }else{
+                return NULL;
+            }
+        }else{
+            fseek(fileRead,256,SEEK_CUR);
+        }
+    }
+    fclose(fileRead);
+    return NULL;
+}
+int checkIfPseudoExistInLC(char *pseudo) {
     node_t *pseudoNode = head;
     while (pseudoNode != NULL) {
         client_t *client = pseudoNode->client;
@@ -269,7 +311,7 @@ int main(int argc, char const *argv[]) {
 
                     /* Set Name for New Client */
                     if (current_client->pseudoSet == 0) {
-                        if (CheckIfPseudoExist(buffer) == -1) {
+                        if (checkIfPseudoExistInLC(buffer) == -1 || checkIfPseudoExistInRegisterFile(buffer) == -1) {
                             memset(buffer, '\0', 1024);
                             snprintf(buffer, 1024, "Sorry, pseudo is already use, please enter a new pseudo :");
                             send(current_client->sockfd, buffer, 1024, 0);
@@ -287,44 +329,91 @@ int main(int argc, char const *argv[]) {
                         /* All Commands */
                     }else if(buffer[0] == '/') {
                         char *tbuf = strtok(buffer, " ");
-                        char *tbufMp = tbuf;
-                        char *tbufAlert = tbuf;
-                        char * tbufRegister = tbuf;
-                        char * tbufUnregister = tbuf;
                         /* Nickname Command */
                         if (tbuf != NULL && !strcmp(tbuf, "/nickname")) {
                             char nickname[32] = {0};
-                            tbuf = strtok(NULL, "\n");
-                            if (tbuf != NULL && strcmp(tbuf, "") != 0) {
-                                strncpy(nickname, tbuf, sizeof(nickname) - 1);
+                            char password[256] = {0};
+                            tbuf = strtok(NULL, " ");
+                            if (tbuf != NULL && tbuf[0] != '\0') {
+                                memset(nickname, '\0', 32);
+                                strncpy(nickname, tbuf, 32);
                             }
-                            if (strcmp(nickname, "") == 0) {
-                                memset(buffer, '\0', 1024);
+                            if (nickname[0] == '\0') {
                                 snprintf(buffer, sizeof(buffer),
                                          "You dont have enter pseudo, please retry /nickname new_pseudo :");
                                 if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
                                     stop("send");
                                 }
-                            } else {
-                                if (CheckIfPseudoExist(nickname) == -1) {
-                                    memset(buffer, '\0', 1024);
-                                    snprintf(buffer, sizeof(buffer),
-                                             "Sorry, pseudo is already use, please retry /nickname new_pseudo :");
-                                    if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
-                                        stop("send");
-                                    }
-                                } else {
-                                    strncpy(current_client->pseudo, nickname, sizeof(current_client->pseudo) - 1);
-                                    memset(buffer, '\0', 1024);
-                                    yellow();
-                                    printf("set new pseudo %s for socket %d \n", current_client->pseudo,
-                                           current_client->sockfd);
-                                    reset();
-                                    snprintf(buffer, sizeof(buffer), "your new pseudo is %s", current_client->pseudo);
-                                    if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
-                                        stop("send");
+                            }
+                            else {
+                                tbuf = strtok(NULL,"\n");
+                                if(tbuf != NULL && tbuf[0] != '\0'){
+                                    strncpy(password,tbuf,sizeof(password) - 1);
+                                }
+                                if(password[0] == '\0'){
+                                    if (checkIfPseudoExistInLC(nickname) == -1 || checkIfPseudoExistInRegisterFile(nickname) == -1) {
+                                        memset(buffer, '\0', 1024);
+                                        snprintf(buffer, sizeof(buffer),
+                                                 "Sorry, pseudo is already use, please retry /nickname new_pseudo :");
+                                        if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
+                                            stop("send");
+                                        }
+                                    } else {
+                                        strncpy(current_client->pseudo, nickname, 32);
+                                        memset(buffer, '\0', 1024);
+                                        yellow();
+                                        printf("set new pseudo %s for socket %d \n", current_client->pseudo,
+                                               current_client->sockfd);
+                                        reset();
+                                        snprintf(buffer, sizeof(buffer), "your new pseudo is %s", current_client->pseudo);
+                                        if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
+                                            stop("send");
+                                        }
                                     }
                                 }
+                                else{
+                                    if (checkIfPseudoExistInLC(nickname) == -1) {
+                                        memset(buffer, '\0', 1024);
+                                        snprintf(buffer, sizeof(buffer),
+                                                 "Sorry, pseudo is already use, please retry /nickname new_pseudo :");
+                                        if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
+                                            stop("send");
+                                        }
+                                    }
+                                    else {
+                                        if(checkIfPseudoExistInRegisterFile(nickname) == -1){
+                                            char * checkedPseudo = calloc(sizeof(char),32);
+                                           checkedPseudo = checkerRegisterFile(nickname,password);
+                                            if(checkedPseudo != NULL){
+                                                strncpy(current_client->pseudo, checkedPseudo, 32);
+                                                memset(buffer, '\0', 1024);
+                                                yellow();
+                                                printf("set new pseudo %s for socket %d \n", current_client->pseudo,
+                                                       current_client->sockfd);
+                                                reset();
+                                                snprintf(buffer, sizeof(buffer), "your new pseudo is %s", current_client->pseudo);
+                                                if (send(current_client->sockfd, buffer, sizeof(buffer), 0) < 0) {
+                                                    stop("send");
+                                                }
+                                            } else{
+                                                memset(buffer, '\0', 1024);
+                                                snprintf(buffer, sizeof(buffer),
+                                                         "Sorry, error on set registered pseudo please retry /nickname pseudo password :");
+                                                if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
+                                                    stop("send");
+                                                }
+                                            }
+                                        }else{
+                                            memset(buffer, '\0', 1024);
+                                            snprintf(buffer, sizeof(buffer),
+                                                     "Sorry, pseudo is not registered, please retry /nickname pseudo password :");
+                                            if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
+                                                stop("send");
+                                            }
+                                        }
+                                    }
+                                }
+
                             }
                         }
 
@@ -357,13 +446,13 @@ int main(int argc, char const *argv[]) {
 
                         }
 
-                        if (tbufRegister != NULL && !strcmp(tbufRegister, "/register")) {
+                        if (tbuf != NULL && !strcmp(tbuf, "/register")) {
                             char registerPseudo[32] = {0};
                             char registerPassword[256] = {0};
                             char errorMessage[256] = {0};
-                            tbufRegister= strtok(NULL, " ");
-                            if (tbufRegister != NULL && strcmp(tbufRegister, "") != 0) {
-                                strncpy(registerPseudo, tbufRegister, 32);
+                            tbuf= strtok(NULL, " ");
+                            if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                strncpy(registerPseudo, tbuf, 32);
                             }
 
                             if (strcmp(registerPseudo, "") == 0) {
@@ -372,9 +461,9 @@ int main(int argc, char const *argv[]) {
                                     stop("send");
                                 }
                             } else {
-                                tbufRegister = strtok(NULL, "\n");
-                                if (tbufRegister != NULL && strcmp(tbufRegister, "") != 0) {
-                                    strncpy(registerPassword, tbufRegister, 256);
+                                tbuf = strtok(NULL, "\n");
+                                if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                    strncpy(registerPassword, tbuf, 256);
                                 }
                                 memset(errorMessage, '\0', 256);
                                 if (strcmp(registerPassword, "") == 0) {
@@ -384,31 +473,44 @@ int main(int argc, char const *argv[]) {
                                         stop("send");
                                     }
                                 }else{
-
-                                    printf("%s\n", registerPseudo);
+                                    FILE *fileWrite;
+                                    fileWrite = fopen("login.dat", "ab");
+                                    fseek(fileWrite,0,SEEK_END);
+                                    if (fileWrite == NULL) {
+                                        printf("Error opening file\n");
+                                    }
+                                    fwrite(registerPseudo, sizeof(char), sizeof(registerPseudo), fileWrite);
+                                    fwrite(registerPassword, sizeof(char), sizeof(registerPassword), fileWrite);
+                                    memset(buffer, '\0', 1024);
+                                    snprintf(buffer, sizeof(buffer),
+                                             "Pseudo registered");
+                                    if(send(current_client->sockfd,buffer,sizeof(buffer),0)<0){
+                                        stop("send");
+                                    }
+                                    fclose(fileWrite);
                                 }
+
                             }
                         }
 
                         /* Mp Command */
-                        if (tbufMp != NULL && !strcmp(tbufMp, "/mp")) {
+                        if (tbuf != NULL && !strcmp(tbuf, "/mp")) {
                             char privateDestName[32] = {0};
                             char privateDestMessage[256] = {0};
                             char errorMessage[256] = {0};
-                            tbufMp = strtok(NULL, " ");
-                            if (tbufMp != NULL && strcmp(tbufMp, "") != 0) {
-                                strncpy(privateDestName, tbufMp, 32);
+                            tbuf = strtok(NULL, " ");
+                            if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                strncpy(privateDestName, tbuf, 32);
                             }
                             if (strcmp(privateDestName, "") == 0) {
-                                printf("Hello\n");
                                 snprintf(errorMessage, 256, "You dont have enter a name in your command, please retry");
                                 if (send(current_client->sockfd, errorMessage, 256, 0) < 0) {
                                     stop("send");
                                 }
                             } else {
-                                tbufMp = strtok(NULL, "\n");
-                                if (tbufMp != NULL && strcmp(tbufMp, "") != 0) {
-                                    strncpy(privateDestMessage, tbufMp, 256);
+                                tbuf = strtok(NULL, "\n");
+                                if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                    strncpy(privateDestMessage, tbuf, 256);
                                 }
                                 memset(errorMessage, '\0', 256);
                                 if (strcmp(privateDestMessage, "") == 0) {
@@ -418,7 +520,7 @@ int main(int argc, char const *argv[]) {
                                         stop("send");
                                     }
                                 } else {
-                                    if (CheckIfPseudoExist(privateDestName) == -1) {
+                                    if (checkIfPseudoExistInLC(privateDestName) == -1) {
                                         memset(buffer, '\0', 1024);
                                         snprintf(buffer, 1024, "private message from %s : %s", current_client->pseudo,
                                                  privateDestMessage);
@@ -433,22 +535,27 @@ int main(int argc, char const *argv[]) {
                             }
                         }
                         /* Alert Command  */
-                        if (tbufAlert != NULL && !strcmp(tbufAlert, "/alerte")) {
+                        if (tbuf != NULL && !strcmp(tbuf, "/alerte")) {
                             char pseudoOrMessage[256] = {0};
-                            tbufAlert = strtok(NULL, " ");
-                            if (tbufAlert != NULL && strcmp(tbufAlert, "") != 0) {
-                                strncpy(pseudoOrMessage, tbufAlert, 256);
-                                if (CheckIfPseudoExist(pseudoOrMessage) == -1) {
-                                    tbufAlert = strtok(NULL, "\n");
-                                    if (tbufAlert != NULL && strcmp(tbufAlert, "") != 0) {
-                                        snprintf(tempbuff, sizeof(buffer), "/alerte private message from %s : %s",current_client->pseudo,tbufAlert);
+                            tbuf = strtok(NULL, " ");
+                            if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                strncpy(pseudoOrMessage, tbuf, 256);
+                                if (checkIfPseudoExistInLC(pseudoOrMessage) == -1) {
+                                    tbuf = strtok(NULL, "\n");
+                                    if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                        snprintf(tempbuff, sizeof(buffer), "/alerte private message from %s : %s", current_client->pseudo, tbuf);
                                         SendPrivateMessage(tempbuff, pseudoOrMessage);
                                     } else {
                                         snprintf(buffer, sizeof(buffer), "need to specify message, please retry");
                                         send(current_client->sockfd, buffer, sizeof(buffer), 0);
                                     }
                                 } else {
-                                    snprintf(buffer, sizeof(buffer), "/alerte %s", pseudoOrMessage);
+                                    tbuf = strtok(NULL, "\n");
+                                    if(tbuf != NULL && tbuf[0] != '\0'){
+                                        snprintf(buffer, sizeof(buffer), "/alerte %s %s", pseudoOrMessage,tbuf);
+                                    }else{
+                                        snprintf(buffer, sizeof(buffer), "/alerte %s", pseudoOrMessage);
+                                    }
                                     SendToAllClients(buffer, current_client->sockfd);
                                 }
                             } else {
