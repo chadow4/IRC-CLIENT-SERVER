@@ -132,6 +132,7 @@ int main(int argc, char *argv[]) {
                 // Display the message with the time of reception
                 if (buffer[0] == '/') {
                     char *tbuf = strtok(buffer, " ");
+                    // check if the message is an alert
                     if (tbuf != NULL && !strcmp(tbuf, "/alerte")) {
                         tbuf = strtok(NULL, "\0");
                         red();
@@ -139,6 +140,7 @@ int main(int argc, char *argv[]) {
                         reset();
                         printf("\n");
                     }
+                    // check if the message is a send file
                     if(tbuf != NULL && !strcmp(tbuf,"/send")){
                         char receivePathFile[64] = {0};
                         char receiveFileContain[256] = {0};
@@ -154,8 +156,9 @@ int main(int argc, char *argv[]) {
                             if(delimReceivPathFile != NULL && strcmp(delimReceivPathFile,"") != 0){
                                 delimReceivPathFile = strtok(NULL,"\n");
                                 if(delimReceivPathFile != NULL && strcmp(delimReceivPathFile,"") != 0) {
-                                    printf("[%s] vous avez recu un fichier du nom de %s\n", time_string, delimReceivPathFile);
+                                    printf("[%s] you have receveid file : %s\n", time_string, delimReceivPathFile);
                                     snprintf(finalPath,64,"receivedFiles/%s",delimReceivPathFile);
+                                    // creating file received
                                     FILE * fp = fopen(finalPath,"w");
                                     fprintf(fp,"%s", receiveFileContain);
                                      fclose(fp);

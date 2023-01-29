@@ -56,6 +56,10 @@ void reset() {
     printf("\033[0m");
 }
 
+/*
+ * SendToAllClients Function
+ * broadcast message for all clients
+*/
 void SendToAllClients(char *buffer, int sockfd) {
     printf("%s\n", buffer);
     node_t *sending_node = head;
@@ -63,7 +67,6 @@ void SendToAllClients(char *buffer, int sockfd) {
         client_t *sending_client = sending_node->client;
         int sending_sockfd = sending_client->sockfd;
         if (sending_sockfd != sockfd && sending_sockfd > -1) {
-            printf("sending to : %d\n", sending_client->sockfd);
             if (send(sending_sockfd, buffer, strnlen(buffer, 1024), 0) < 0) {
                 stop("send");
             }
@@ -72,6 +75,10 @@ void SendToAllClients(char *buffer, int sockfd) {
     }
 }
 
+/*
+ * checkIfPseudoExistInRegisterFile Function
+ * check if the user exist in login.dat file and return -1 if exist
+*/
 int checkIfPseudoExistInRegisterFile(char *pseudo) {
     FILE *fileRead;
     fileRead = fopen("login.dat", "rb");
@@ -90,6 +97,11 @@ int checkIfPseudoExistInRegisterFile(char *pseudo) {
     fclose(fileRead);
     return 0;
 }
+
+/*
+ * checkerRegisterFile Function
+ * return pseudo if it is in the login.dat file
+*/
 
 char *checkerRegisterFile(char *pseudo, char *password) {
     FILE *fileRead;
@@ -116,6 +128,11 @@ char *checkerRegisterFile(char *pseudo, char *password) {
     return NULL;
 }
 
+/*
+ * checkIfPseudoExistInLC Function
+ * verify if the pseudo is in LinkedList
+*/
+
 int checkIfPseudoExistInLC(char *pseudo) {
     node_t *pseudoNode = head;
     while (pseudoNode != NULL) {
@@ -127,7 +144,10 @@ int checkIfPseudoExistInLC(char *pseudo) {
     }
     return 0;
 }
-
+/*
+ * checkIfSocketIsNull Function
+ * verify if one socket is null in the LinkedList
+*/
 client_t *checkIfSocketIsNull() {
     node_t *check_socket_node = head;
     while (check_socket_node != NULL) {
@@ -140,6 +160,10 @@ client_t *checkIfSocketIsNull() {
     return NULL;
 }
 
+/*
+ * disconnectClient Function
+ * If the client is disconnected, the socket is set to -1 and the name is reset by replacing all characters with null characters (\0)
+*/
 void disconnectClient(char *pseudo) {
     node_t *disconnect_node = head;
     char buffer[1024] = {0};
@@ -163,39 +187,12 @@ void disconnectClient(char *pseudo) {
     }
 }
 
-void printDebugLC() {
-    node_t *current = head;
-    while (current != NULL) {
-        client_t *client = current->client;
-        printf("=========================== Socket : %d ====================\n", client->sockfd);
-        printf("pseudo: %s \n", client->pseudo);
-        current = (node_t *) current->next;
-    }
-}
+/*
+ * sendPrivateMessage Function
+ * this function send unicast message
+ */
 
-
-void removeClient(client_t *client) {
-    node_t *current = head;
-    node_t *previous = NULL;
-
-    while (current != NULL) {
-        if (current->client == client) {
-            if (previous == NULL) { // client est en tête de liste
-                head = NULL;
-            } else { // client est au milieu ou à la fin de la liste
-                previous->next = current->next;
-            }
-            free(current->client);
-            free(current);
-            printf("Le client a était supprimé de la LC\n");
-            return;
-        }
-        previous = current;
-        current = current->next;
-    }
-}
-
-void SendPrivateMessage(char *buffer, char *pseudo) {
+void sendPrivateMessage(char *buffer, char *pseudo) {
     node_t *sending_node = head;
     while (sending_node != NULL) {
         client_t *client = sending_node->client;
@@ -220,29 +217,29 @@ int main(int argc, char const *argv[]) {
     int fdmax; // Maximum file descriptor number
     int addrlen = sizeof(address);
 
-    // Création du Socket
+    // create the server socket
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         stop("Socket Failed");
     }
 
-    // Option du socket
+    // Option of socket
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
         stop("setsockopt");
     }
 
-    // remplissage de serveaddr par des 0
+    // replacing all characters with null characters (\0).
     memset((char *) &address, 0, sizeof(address)); // remplissage de serveraddr de 0
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Binding du socket
+    // Binding of socket
     if (bind(server_fd, (struct sockaddr *) &address, sizeof(address)) < 0) {
         stop("bind failed");
     }
 
-    // debut du listening pour les connexions entrantes
+    // start of listening for incoming connections
     if (listen(server_fd, 5) < 0) {
         stop("listen");
     }
@@ -350,6 +347,7 @@ int main(int argc, char const *argv[]) {
                     } else if (buffer[0] == '/') {
                         char *tbuf = strtok(buffer, " ");
                         char *tbufSend = tbuf;
+
                         /* Nickname Command */
                         if (tbuf != NULL && !strcmp(tbuf, "/nickname")) {
                             char nickname[32] = {0};
@@ -456,7 +454,7 @@ int main(int argc, char const *argv[]) {
                             close(current_client->sockfd);
                             current_client->sockfd = -1;
                         }
-
+                        /* Register Command */
                         if (tbuf != NULL && !strcmp(tbuf, "/register")) {
                             char registerPseudo[32] = {0};
                             char registerPassword[256] = {0};
@@ -529,7 +527,7 @@ int main(int argc, char const *argv[]) {
                                         memset(buffer, '\0', 1024);
                                         snprintf(buffer, 1024, "private message from %s : %s", current_client->pseudo,
                                                  privateDestMessage);
-                                        SendPrivateMessage(buffer, privateDestName);
+                                        sendPrivateMessage(buffer, privateDestName);
                                     } else {
                                         snprintf(buffer, 1024, "Pseudo not found, please retry !");
                                         if (send(current_client->sockfd, buffer, 1024, 0) < 0) {
@@ -550,7 +548,7 @@ int main(int argc, char const *argv[]) {
                                     if (tbuf != NULL && strcmp(tbuf, "") != 0) {
                                         snprintf(tempbuff, sizeof(buffer), "/alerte private message from %s : %s",
                                                  current_client->pseudo, tbuf);
-                                        SendPrivateMessage(tempbuff, pseudoOrMessage);
+                                        sendPrivateMessage(tempbuff, pseudoOrMessage);
                                     } else {
                                         snprintf(buffer, sizeof(buffer), "need to specify message, please retry");
                                         send(current_client->sockfd, buffer, sizeof(buffer), 0);
@@ -588,7 +586,7 @@ int main(int argc, char const *argv[]) {
                                         }
                                         memset(tempbuff,'\0',1024+256+32);
                                         snprintf(tempbuff, sizeof(tempbuff), "/send %s %s", pathFile,fileContainer);
-                                        SendPrivateMessage(tempbuff, pseudo);
+                                        sendPrivateMessage(tempbuff, pseudo);
                                     }
                                 } else {
                                     snprintf(buffer, 1024, "Pseudo not found, please retry !");
