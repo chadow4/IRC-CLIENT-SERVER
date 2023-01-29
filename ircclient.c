@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
                 strftime(time_string, sizeof(time_string), "%F %T", timeinfo);
                 if (buffer[0] == '/') {
                     char *tbuf = strtok(buffer, " ");
-                    if (tbuf != NULL && strcmp(tbuf, "/alert")) {
+                    if (tbuf != NULL && !strcmp(tbuf, "/alerte")) {
                         tbuf = strtok(NULL, "\0");
                         red();
                         printf("[%s] %s", time_string, tbuf);
