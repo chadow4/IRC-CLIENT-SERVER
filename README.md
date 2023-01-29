@@ -29,7 +29,7 @@ This project implements a working IRC server and client.  (+ basic TCP server an
 - get server time ``/date``(implemented)
 - register a nickname ``/register nickname password``(implemented)
 - unregister a nickname ``/unregister pseudo password ``(not implemented)
-- send file ``/send pseudo file.txt``(not implemented)
+- send file ``/send pseudo ./file.txt``(implemented) ==> for example ``/send pseudo sendFiles/filesend.txt`` and received in receivedFiles Folder.
 - exit ``/exit``(implemented)
 
 
