@@ -139,6 +139,30 @@ int main(int argc, char *argv[]) {
                         reset();
                         printf("\n");
                     }
+                    if(tbuf != NULL && !strcmp(tbuf,"/send")){
+                        char receivePathFile[64] = {0};
+                        char receiveFileContain[256] = {0};
+                        char finalPath[64] = {0};
+                        tbuf = strtok(NULL," ");
+                        if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                            strncpy(receivePathFile, tbuf, 64);
+                            tbuf = strtok(NULL,"\n");
+                            if (tbuf != NULL && strcmp(tbuf, "") != 0) {
+                                strncpy(receiveFileContain, tbuf, 64);
+                            }
+                            char * delimReceivPathFile = strtok(receivePathFile,"/");
+                            if(delimReceivPathFile != NULL && strcmp(delimReceivPathFile,"") != 0){
+                                delimReceivPathFile = strtok(NULL,"\n");
+                                if(delimReceivPathFile != NULL && strcmp(delimReceivPathFile,"") != 0) {
+                                    printf("[%s] vous avez recu un fichier du nom de %s\n", time_string, delimReceivPathFile);
+                                    snprintf(finalPath,64,"receivedFiles/%s",delimReceivPathFile);
+                                    FILE * fp = fopen(finalPath,"w");
+                                    fprintf(fp,"%s", receiveFileContain);
+                                     fclose(fp);
+                                }
+                            }
+                        }
+                    }
                 } else {
                     printf("[%s] %s\n", time_string, buffer);
                 }
@@ -190,17 +214,16 @@ int main(int argc, char *argv[]) {
                     // read contain of file
                     fread(fileContainer, 1, 512, fp);
                     fclose(fp);
-                    snprintf(tempbuff, 1024, "/send %s %s", nicknameReceiver, fileContainer);
+                    snprintf(tempbuff, 1024, "/send %s %s %s", nicknameReceiver, pathFile, fileContainer);
                     remove_end_line(tempbuff, 1024);
-                    printf("buffer file : %s\n", tempbuff);
-                    result = send(sockfd, tempbuff, strnlen(buffer, 1024) + 1, 0);
+                    result = send(sockfd, tempbuff, 1024, 0);
                     if (result < 0) {
                         stop("Error: sending message");
                     }
 
                 } else {
                     remove_end_line(buffer, 1024);
-                    result = send(sockfd, buffer, strnlen(buffer, 1024) + 1, 0);
+                    result = send(sockfd, buffer, 1024, 0);
                     if (result < 0) {
                         stop("Error: sending message");
                     }

@@ -200,7 +200,7 @@ void SendPrivateMessage(char *buffer, char *pseudo) {
     while (sending_node != NULL) {
         client_t *client = sending_node->client;
         if (strcmp(client->pseudo, pseudo) == 0) {
-            printf("test buffer : %s\n", buffer);
+            printf("sended to %s : %s\n",client->pseudo,buffer);
             if (send(client->sockfd, buffer, 1024, 0) < 0) {
                 stop("send");
             }
@@ -215,7 +215,7 @@ int main(int argc, char const *argv[]) {
     struct sockaddr_in address;
     int opt = 1;
     char buffer[1024] = {0};
-    char tempbuff[1024 + 32] = {0};
+    char tempbuff[1024 + 256 +32] = {0};
     fd_set read_fds; // Set of file descriptors for select function
     int fdmax; // Maximum file descriptor number
     int addrlen = sizeof(address);
@@ -349,6 +349,7 @@ int main(int argc, char const *argv[]) {
                         /* All Commands */
                     } else if (buffer[0] == '/') {
                         char *tbuf = strtok(buffer, " ");
+                        char *tbufSend = tbuf;
                         /* Nickname Command */
                         if (tbuf != NULL && !strcmp(tbuf, "/nickname")) {
                             char nickname[32] = {0};
@@ -568,6 +569,34 @@ int main(int argc, char const *argv[]) {
                                 send(current_client->sockfd, buffer, sizeof(buffer), 0);
                             }
                         }
+
+                        /* Send Command  */
+                        if (tbufSend != NULL && !strcmp(tbufSend, "/send")) {
+                            char pseudo[32] = {0};
+                            char fileContainer[256] = {0};
+                            char pathFile[32] = {0};
+                            tbufSend = strtok(NULL, " ");
+                            if (tbufSend != NULL && strcmp(tbufSend, "") != 0) {
+                                strncpy(pseudo, tbufSend, 32);
+                                if (checkIfPseudoExistInLC(pseudo) == -1) {
+                                    tbufSend = strtok(NULL, " ");
+                                    if (tbufSend != NULL && strcmp(tbufSend, "") != 0) {
+                                        strncpy(pathFile, tbufSend, 32);
+                                        tbufSend = strtok(NULL,"\n"); //delim
+                                        if(tbufSend != NULL && strcmp(tbuf,"") != 0){
+                                            strncpy(fileContainer,tbufSend,256);
+                                        }
+                                        memset(tempbuff,'\0',1024+256+32);
+                                        snprintf(tempbuff, sizeof(tempbuff), "/send %s %s", pathFile,fileContainer);
+                                        SendPrivateMessage(tempbuff, pseudo);
+                                    }
+                                } else {
+                                    snprintf(buffer, 1024, "Pseudo not found, please retry !");
+                                    send(current_client->sockfd, buffer, sizeof(buffer), 0);
+                                }
+                            }
+                        }
+
 
                     } else {
                         /* SendAll */
