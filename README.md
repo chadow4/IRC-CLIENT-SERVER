@@ -1,4 +1,4 @@
-# TP RESEAU : IRC
+# IRC Client & Server
 
 ## About the Project
 
